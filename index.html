@@ -1,1 +1,560 @@
 
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Focus Sprint — Study Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg-dark:#0b1220;
+      --card:#0f1724;
+      --muted:#94a3b8;
+      --accent:linear-gradient(90deg,#7c3aed,#06b6d4);
+      --amber:#f59e0b;
+      --orange:#f97316;
+      --success:#10b981;
+      --danger:#ef4444;
+      --glass: rgba(255,255,255,0.02);
+      --text:#e6eef8;
+      --text-muted:#9ca3af;
+      font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      color-scheme: dark;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0}
+    body{
+      background: linear-gradient(180deg,#071129 0%, #071428 60%);
+      color:var(--text);
+      padding:22px;
+      -webkit-font-smoothing:antialiased;
+    }
+    .container{
+      max-width:1280px;margin:0 auto;display:grid;grid-template-columns:1fr 420px;gap:20px;
+    }
+    header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,#7c3aed,#4f46e5);display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:18px;box-shadow:0 10px 30px rgba(7,18,36,0.6)}
+    h1{margin:0;font-size:20px}
+    .lead{margin:0;color:var(--muted);font-size:13px}
+
+    .main{display:grid;grid-template-columns:1fr;gap:16px}
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:12px;padding:14px;border:1px solid rgba(255,255,255,0.03);box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+    .progress-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+    .progress-card h4{margin:0 0 8px 0;display:flex;justify-content:space-between;align-items:center}
+    .progress-bar{background:rgba(255,255,255,0.03);height:10px;border-radius:8px;overflow:hidden}
+    .progress-inner{height:100%;border-radius:8px;background:linear-gradient(90deg,#f59e0b,#f97316);transition:width .5s ease}
+
+    .task-inputs{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+    .input, textarea, select{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:10px;border-radius:8px;color:var(--text);font-family:inherit}
+    .btn{background:linear-gradient(90deg,#7c3aed,#06b6d4);color:white;padding:10px 12px;border-radius:10px;border:0;font-weight:600;cursor:pointer}
+    .btn-muted{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--text);padding:8px 10px;border-radius:8px;cursor:pointer}
+    .small{padding:8px 10px;font-size:13px}
+
+    .task-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+    .task{display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;background:var(--glass);border:1px solid rgba(255,255,255,0.02)}
+    .task .title{flex:1;font-weight:600}
+    .task.done{opacity:0.55;text-decoration:line-through}
+    .meta{font-size:12px;color:var(--muted)}
+
+    .sidebar{display:flex;flex-direction:column;gap:12px}
+    .notes{min-height:140px;resize:vertical;padding:10px;border-radius:8px;border:1px dashed rgba(255,255,255,0.03);background:transparent;color:var(--text)}
+    .links-list,.rewards-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+    .row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px;border-radius:8px;background:linear-gradient(180deg, rgba(255,255,255,0.008), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.02)}
+    .phd-link{color:#7c3aed;text-decoration:none;font-weight:600}
+    .small-muted{font-size:13px;color:var(--muted)}
+    .toast-wrap{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:9999}
+
+    .schedule-rows{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+    .sche{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)}
+    .time{font-weight:700;color:#06b6d4}
+
+    footer{grid-column:1/-1;margin-top:8px;color:var(--muted);font-size:13px;text-align:center}
+
+    @media (max-width:1024px){ .container{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+  <div class="container" role="application" aria-label="Study Dashboard">
+    <header>
+      <div class="brand">
+        <div class="logo">N</div>
+        <div>
+          <h1>Focus Sprint — 2 Month Plan</h1>
+          <p class="lead">DSA · Core CS · GenAI · Agentic AI · PhD apps</p>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="small-muted">Now: <strong id="nowClock">--</strong></div>
+        <div class="small-muted">Streak: <strong id="streakCount">0</strong> 🔥</div>
+      </div>
+    </header>
+    
+    <p id="dailyQuote" class="small-muted" style="grid-column: 1 / -1; text-align: center; margin: -10px 0 20px 0;"></p>
+
+    <main class="main">
+      <section class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+          <h3 style="margin:0">Progress</h3>
+          <div class="small-muted">Completed hours approximate from finished tasks</div>
+        </div>
+        <div class="progress-grid" id="progressGrid" style="margin-top:12px"></div>
+      </section>
+
+      <section class="card">
+        <h3 style="margin-top:0">Today's Mission</h3>
+        <div class="task-inputs">
+          <input id="taskTitle" class="input" placeholder="Task title (e.g., BST video + 2 problems)" style="flex:1" />
+          <select id="taskCategory" class="input" style="width:150px">
+            <option value="General">General</option>
+            <option value="DSA">DSA</option>
+            <option value="OOP">OOP</option>
+            <option value="DBMS">DBMS</option>
+            <option value="OS">OS</option>
+            <option value="CN">CN</option>
+            <option value="AI">AI/Agents</option>
+            <option value="PhD">PhD Apps</option>
+          </select>
+          <input id="taskDue" class="input" type="datetime-local" style="width:210px"/>
+          <input id="taskRem" class="input" type="number" min="0" placeholder="rem min" style="width:100px"/>
+          <button id="addTaskBtn" class="btn small">Add</button>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button id="prefillSchedule" class="btn small">Load Daily Schedule</button>
+          <button id="clearDoneBtn" class="btn-muted small">Clear Completed</button>
+          <button id="runMock" class="btn-muted small">Run 1-hr Mock</button>
+          <div style="flex:1"></div>
+          <div class="small-muted">Auto-save: local</div>
+        </div>
+
+        <div id="taskList" class="task-list" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <aside class="sidebar">
+      <div class="card">
+        <h4 style="margin:0 0 8px 0">Quick Notes</h4>
+        <div class="small-muted">Autosaved</div>
+        <textarea id="notesArea" class="notes" placeholder="Your notes, paper ideas, PhD drafts..."></textarea>
+      </div>
+
+      <div class="card">
+        <h4 style="margin:0 0 8px 0">PhD Opportunities</h4>
+        <div class="small-muted">Save application pages / prof links</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input id="phdTitle" class="input" placeholder="Title (Prof X - Lab)" style="flex:1"/>
+          <input id="phdUrl" class="input" placeholder="URL" style="width:160px"/>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="addPhd" class="btn small">Add</button>
+          <button id="importPhd" class="btn-muted small">Import JSON</button>
+        </div>
+        <div id="phdList" class="links-list"></div>
+      </div>
+
+      <div class="card">
+        <h4 style="margin:0 0 8px 0">Rewards & Motivation</h4>
+        <div class="small-muted">Add rewards and celebrate when earned</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input id="rewText" class="input" placeholder="Reward (e.g., Movie night)" style="flex:1"/>
+          <button id="addReward" class="btn small">Add</button>
+        </div>
+        <div id="rewards" class="rewards-list"></div>
+      </div>
+
+      <div class="card">
+        <h4 style="margin:0 0 8px 0">Data & Schedule</h4>
+        <div class="small-muted">Backup / restore or load default schedule</div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button id="exportDataBtn" class="btn small">Export</button>
+          <button id="importDataBtn" class="btn-muted small">Import</button>
+          <input type="file" id="importFileInput" accept=".json" style="display:none" />
+        </div>
+        <div style="margin-top:10px">
+          <button id="prefillTemplate" class="btn small">Insert Study Template Tasks</button>
+        </div>
+        <div class="small-muted" style="margin-top:8px">Notifications require permission when prompted.</div>
+      </div>
+    </aside>
+
+    <footer>Save this file as <strong>index.html</strong>. Works locally or host on GitHub Pages. Data stored in browser localStorage.</footer>
+
+    <div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+  </div>
+
+<script>
+/* Focus Sprint — integrated JS
+    Features:
+    - tasks: add/edit/delete/check, due + reminder (minutes before)
+    - progress per subject estimated from completed tasks
+    - notes autosave
+    - PhD links (add/edit/delete)
+    - rewards (add/earn/delete)
+    - export/import JSON backup
+    - prefilled schedule & template loader
+    - toasts and browser notifications
+    - localStorage persistence
+*/
+
+/* ----- Daily Motivational Quote ----- */
+const quotes = [
+  "Push yourself, because no one else will do it for you.",
+  "Dreams don’t work unless you do.",
+  "Stay consistent, even when it’s hard.",
+  "Every expert was once a beginner.",
+  "Focus on progress, not perfection.",
+  "Small steps each day lead to big results.",
+  "Discipline beats motivation.",
+  "Your only limit is you.",
+  "Do it now. Sometimes ‘later’ becomes ‘never’.",
+  "Hard work compounds — keep stacking!",
+  "Consistency creates momentum.",
+  "Win the morning, win the day."
+];
+
+function setDailyQuote(){
+  const todayIndex = new Date().getDate() % quotes.length;
+  document.getElementById("dailyQuote").textContent = `"${quotes[todayIndex]}"`;
+}
+setDailyQuote();
+
+// auto-refresh quote at midnight
+const now = new Date();
+const msUntilMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 0,0,0) - now;
+setTimeout(()=>{ setDailyQuote(); setInterval(setDailyQuote, 86400000); }, msUntilMidnight);
+
+
+const STORAGE_KEY = "focusSprint_v2";
+
+const defaultState = {
+  tasks: [
+    // sample tasks for today's schedule
+    {id:genId(), title:"DSA practice (BST) - watch + 3 problems", category:"DSA", due: todayTimeStr("09:00"), remMin:15, done:false},
+    {id:genId(), title:"Core CS: OOP video (chunk)", category:"OOP", due: todayTimeStr("11:15"), remMin:10, done:false},
+    {id:genId(), title:"GenAI - Transformers video + notebook", category:"AI", due: todayTimeStr("15:00"), remMin:15, done:false},
+    {id:genId(), title:"PhD applications (1 hr) — draft emails", category:"PhD", due: todayTimeStr("20:30"), remMin:30, done:false},
+    {id:genId(), title:"Night: DSA revision & LeetCode", category:"DSA", due: todayTimeStr("22:00"), remMin:10, done:false}
+  ],
+  notes: "Start each session by reviewing yesterday's notes.",
+  phdLinks: [],
+  rewards: [{id:genId(), text:"Ice cream (small)", earned:false},{id:genId(), text:"Movie night", earned:false}],
+  schedule: [
+    {time:"09:00-11:00", desc:"DSA Practice (2 hrs)"},
+    {time:"11:15-13:00", desc:"Core CS (1.5 hrs)"},
+    {time:"15:00-17:00", desc:"GenAI (2 hrs)"},
+    {time:"17:15-17:30", desc:"Quick Revision (15 min)"},
+    {time:"20:30-21:30", desc:"PhD Applications (1 hr)"},
+    {time:"22:00-02:00", desc:"Night block: DSA / Core CS / Agents (4 hrs)"},
+  ],
+  streak:0,
+  lastCompletionDate: null
+};
+
+// subject configs for progress calculation
+const SUBJECTS = {
+  DSA: { totalHours: 60, color: '#f59e0b' },
+  OOP: { totalHours: 5, color: '#8b5cf6' },
+  DBMS: { totalHours: 12, color: '#06b6d4' },
+  OS: { totalHours: 15, color: '#ec4899' },
+  CN: { totalHours: 5, color: '#3b82f6' },
+  AI: { totalHours: 42, color: '#f97316' },
+  PhD: { totalHours: 20, color: '#7c3aed' },
+  General: { totalHours: 20, color: '#94a3b8' }
+};
+
+let state = loadState();
+
+function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function todayTimeStr(hm){
+  const d=new Date(); const [hh,mm]=hm.split(":");
+  d.setHours(parseInt(hh,10),parseInt(mm,10),0,0);
+  return toLocalInput(d);
+}
+function toLocalInput(d){
+  const pad=n=>n<10? "0"+n: n;
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw){ localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultState)); return JSON.parse(JSON.stringify(defaultState)); }
+    return JSON.parse(raw);
+  }catch(e){ console.error(e); localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultState)); return JSON.parse(JSON.stringify(defaultState)); }
+}
+function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); renderAll(); }
+
+/* ----- DOM refs ----- */
+const $ = s=>document.querySelector(s);
+const taskListEl = $("#taskList");
+const progressGrid = $("#progressGrid");
+const notesArea = $("#notesArea");
+const nowClock = $("#nowClock");
+const streakCountEl = $("#streakCount");
+const toastWrap = $("#toastWrap");
+const phdListEl = $("#phdList");
+const rewardsEl = $("#rewards");
+
+/* ----- Renderers ----- */
+function renderAll(){
+  renderClock();
+  renderProgress();
+  renderTasks();
+  renderNotes();
+  renderPhdLinks();
+  renderRewards();
+  renderStreak();
+}
+function renderClock(){
+  const d=new Date(); nowClock.textContent = d.toLocaleString();
+}
+function renderProgress(){
+  progressGrid.innerHTML = "";
+  // compute completed hours per subject:  each completed task counted as 1.5 hours (approx)
+  const completed = {};
+  Object.keys(SUBJECTS).forEach(k=>completed[k]=0);
+  (state.tasks||[]).forEach(t=>{ if(t.done){ const cat = t.category || "General"; completed[cat] = (completed[cat]||0) + 1.5; }});
+  for(const s in SUBJECTS){
+    const conf = SUBJECTS[s];
+    const hours = completed[s] || 0;
+    const pct = Math.min(100, Math.round((hours / conf.totalHours)*100));
+    const card = document.createElement("div");
+    card.className = "progress-card card";
+    card.innerHTML = `<h4>${s}<span class="small-muted">${hours.toFixed(1)} / ${conf.totalHours} hrs</span></h4>
+      <div class="progress-bar"><div class="progress-inner" style="width:${pct}%; background:${conf.color}"></div></div>`;
+    progressGrid.appendChild(card);
+  }
+}
+function renderTasks(){
+  if(!state.tasks || state.tasks.length===0){
+    taskListEl.innerHTML = '<div class="small-muted">No tasks yet — add one above.</div>'; return;
+  }
+  // sort by done then due
+  const arr = state.tasks.slice().sort((a,b)=> (a.done - b.done) || (new Date(a.due||0) - new Date(b.due||0)));
+  taskListEl.innerHTML = "";
+  arr.forEach(t=>{
+    const row = document.createElement("div");
+    row.className = "task"+(t.done? " done":"");
+    row.innerHTML = `
+      <input type="checkbox" ${t.done? "checked":""} data-id="${t.id}" aria-label="done-${t.title}" />
+      <div style="flex:1">
+        <div class="title">${escape(t.title)} <span class="small-muted" style="font-weight:400">[${t.category||'General'}]</span></div>
+        <div class="meta">${t.due? new Date(t.due).toLocaleString() : 'No due'} · ${t.remMin? t.remMin+'m before':''}</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-muted small" data-edit="${t.id}">Edit</button>
+        <button class="btn small" data-del="${t.id}" style="background:linear-gradient(90deg,#ef4444,#f43f5e)">Delete</button>
+      </div>`;
+    // checkbox listener
+    row.querySelector(`input[type="checkbox"]`).addEventListener("change", e=>{
+      t.done = e.target.checked;
+      if(t.done) updateStreak();
+      saveState();
+    });
+    row.querySelector(`[data-edit="${t.id}"]`).addEventListener("click", ()=> editTask(t.id));
+    row.querySelector(`[data-del="${t.id}"]`).addEventListener("click", ()=> {
+      if(!confirm("Delete this task?")) return;
+      state.tasks = state.tasks.filter(x=>x.id!==t.id); saveState(); toast("Task deleted");
+    });
+    taskListEl.appendChild(row);
+  });
+}
+function renderNotes(){ notesArea.value = state.notes || ""; }
+function renderPhdLinks(){
+  phdListEl.innerHTML = "";
+  if(!state.phdLinks || state.phdLinks.length===0) { phdListEl.innerHTML = '<div class="small-muted">No PhD links saved.</div>'; return; }
+  state.phdLinks.forEach(l=>{
+    const el = document.createElement("div"); el.className="row";
+    el.innerHTML = `<div style="flex:1"><a class="phd-link" href="${escapeAttr(l.url)}" target="_blank" rel="noopener">${escape(l.title)}</a>
+      <div class="small-muted" style="margin-top:6px">${escape(l.url)}</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn-muted small" data-edit="${l.id}">Edit</button>
+        <button class="btn small" data-del="${l.id}" style="background:linear-gradient(90deg,#ef4444,#f43f5e)">Delete</button>
+      </div>`;
+    el.querySelector(`[data-edit="${l.id}"]`).addEventListener("click", ()=>{
+      const newT = prompt("Edit title", l.title); if(newT===null) return;
+      const newU = prompt("Edit URL", l.url); if(newU===null) return;
+      l.title = newT; l.url = newU; saveState(); toast("Link updated");
+    });
+    el.querySelector(`[data-del="${l.id}"]`).addEventListener("click", ()=>{
+      if(!confirm("Remove this link?")) return;
+      state.phdLinks = state.phdLinks.filter(x=>x.id!==l.id); saveState(); toast("Link removed");
+    });
+    phdListEl.appendChild(el);
+  });
+}
+function renderRewards(){
+  rewardsEl.innerHTML = "";
+  if(!state.rewards || state.rewards.length===0){ rewardsEl.innerHTML = '<div class="small-muted">No rewards yet.</div>'; return; }
+  state.rewards.forEach(r=>{
+    const el = document.createElement("div"); el.className="row";
+    el.innerHTML = `<div style="flex:1"><strong ${r.earned? 'style="text-decoration:line-through;opacity:.6"':""}>${escape(r.text)}</strong>
+      <div class="small-muted">Click Earn to mark</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn small" data-earn="${r.id}" style="background:linear-gradient(90deg,#10b981,#059669)">Earn</button>
+        <button class="btn-muted small" data-del="${r.id}">Delete</button>
+      </div>`;
+    el.querySelector(`[data-earn="${r.id}"]`).addEventListener("click", ()=>{
+      r.earned = !r.earned; saveState();
+      if(r.earned) { toast("Reward earned 🎉", r.text); notify("Reward earned", r.text); }
+    });
+    el.querySelector(`[data-del="${r.id}"]`).addEventListener("click", ()=>{
+      if(!confirm("Delete reward?")) return;
+      state.rewards = state.rewards.filter(x=>x.id!==r.id); saveState();
+    });
+    rewardsEl.appendChild(el);
+  });
+}
+function renderStreak(){ streakCountEl.textContent = state.streak || 0; }
+
+/* ----- helpers ----- */
+function escape(s){ if(!s) return ""; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s){ return escape(s).replace(/"/g,'&quot;'); }
+function toast(title, text=""){ const node=document.createElement("div"); node.className="card"; node.style.minWidth="240px"; node.innerHTML=`<strong>${escape(title)}</strong><div class="small-muted" style="margin-top:6px">${escape(text)}</div>`; toastWrap.prepend(node); setTimeout(()=>node.style.opacity=0,6000); setTimeout(()=>node.remove(),6800); }
+
+/* ----- event wiring ----- */
+document.getElementById("addTaskBtn").addEventListener("click", ()=>{
+  const title = document.getElementById("taskTitle").value.trim();
+  const cat = document.getElementById("taskCategory").value;
+  const due = document.getElementById("taskDue").value || null;
+  const remMin = parseInt(document.getElementById("taskRem").value || 0,10) || 0;
+  if(!title){ alert("Provide a title"); return; }
+  state.tasks.push({id:genId(), title, category:cat, due: due, remMin: remMin, done:false});
+  document.getElementById("taskTitle").value=""; document.getElementById("taskDue").value=""; document.getElementById("taskRem").value="";
+  saveState(); toast("Task added", title);
+});
+
+document.getElementById("clearDoneBtn").addEventListener("click", ()=>{
+  state.tasks = state.tasks.filter(t=>!t.done); saveState(); toast("Cleared completed tasks");
+});
+document.getElementById("runMock").addEventListener("click", ()=>{
+  const now = new Date(); const start = new Date(now.getTime()+10*60000); state.tasks.push({id:genId(), title:"1-hr Mock Test", category:"General", due: toLocalInput(start), remMin:5, done:false}); saveState(); toast("Mock scheduled");
+});
+
+document.getElementById("prefillSchedule").addEventListener("click", ()=>{
+  if(!confirm("Load today's schedule as tasks?")) return;
+  (state.schedule||[]).forEach(s=>{
+    const m = s.time.match(/(\d{2}:\d{2})/);
+    if(!m) return;
+    state.tasks.push({id:genId(), title:s.desc, category:"General", due: todayTimeStr(m[1]), remMin:15, done:false});
+  });
+  saveState(); toast("Schedule loaded");
+});
+
+document.getElementById("prefillTemplate").addEventListener("click", ()=>{
+  if(!confirm("Insert study template tasks?")) return;
+  // sample template tasks to help mapping video durations
+  const template = [
+    {title:"Watch OOP video (chunk)", category:"OOP"},
+    {title:"DBMS: normalization video (chunk)", category:"DBMS"},
+    {title:"OS: process & threads video (chunk)", category:"OS"},
+    {title:"GenAI: Transformers video + notebook", category:"AI"},
+    {title:"Agentic AI: LangChain intro", category:"AI"},
+    {title:"PhD: draft application email", category:"PhD"}
+  ];
+  const now = new Date();
+  template.forEach((t,i)=> state.tasks.push({id:genId(), title:t.title, category:t.category, due: toLocalInput(new Date(now.getTime() + (i+1)*3600000)), remMin:15, done:false}));
+  saveState(); toast("Template inserted");
+});
+
+/* ----- notes autosave ----- */
+const notesAreaEl = document.getElementById("notesArea");
+notesAreaEl.addEventListener("input", debounce(()=>{ state.notes = notesAreaEl.value; saveState(); }, 600));
+
+/* ----- phd links ----- */
+document.getElementById("addPhd").addEventListener("click", ()=>{
+  const t = document.getElementById("phdTitle").value.trim();
+  const u = document.getElementById("phdUrl").value.trim();
+  if(!t || !u){ alert("Provide title and url"); return; }
+  state.phdLinks = state.phdLinks || []; state.phdLinks.push({id:genId(), title:t, url:u}); document.getElementById("phdTitle").value=""; document.getElementById("phdUrl").value=""; saveState(); toast("PhD link added", t);
+});
+
+/* ----- rewards ----- */
+document.getElementById("addReward").addEventListener("click", ()=>{
+  const text = document.getElementById("rewText").value.trim(); if(!text) return alert("Add reward text");
+  state.rewards = state.rewards || []; state.rewards.push({id:genId(), text, earned:false}); document.getElementById("rewText").value=""; saveState(); toast("Reward added");
+});
+
+/* ----- export / import ----- */
+document.getElementById("exportDataBtn").addEventListener("click", ()=>{
+  const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`focus-sprint-backup-${new Date().toISOString().split('T')[0]}.json`; a.click(); URL.revokeObjectURL(a.href);
+});
+document.getElementById("importDataBtn").addEventListener("click", ()=> document.getElementById("importFileInput").click());
+document.getElementById("importFileInput").addEventListener("change", e=>{
+  const file = e.target.files[0]; if(!file) return;
+  const reader = new FileReader(); reader.onload = ev=>{
+    try{ const imported = JSON.parse(ev.target.result); state = {...defaultState, ...imported}; saveState(); toast("Data imported"); } catch(err){ alert("Invalid file"); }
+  }; reader.readAsText(file);
+});
+
+/* ----- task edit ----- */
+function editTask(id){
+  const t = state.tasks.find(x=>x.id===id); if(!t) return;
+  const newT = prompt("Edit title", t.title); if(newT===null) return;
+  const newDue = prompt("Due (YYYY-MM-DDTHH:MM) or empty", t.due||""); if(newDue===null) return;
+  const newRem = prompt("Reminder minutes before (0 none)", t.remMin||0); if(newRem===null) return;
+  t.title = newT.trim()||t.title; t.due = newDue.trim()||null; t.remMin = parseInt(newRem,10)||0; saveState(); toast("Task updated");
+}
+
+/* ----- reminders & notifications ----- */
+let notifiedSet = new Set();
+function checkReminders(){
+  const now = new Date();
+  (state.tasks||[]).forEach(t=>{
+    if(!t.due || t.done) return;
+    const due = new Date(t.due);
+    const remMin = parseInt(t.remMin||0,10);
+    const trigger = new Date(due.getTime() - remMin*60000);
+    if(now >= trigger && !notifiedSet.has("rem:"+t.id)){
+      const msg = `${t.title} — due at ${due.toLocaleTimeString()}`;
+      toast("Reminder", msg); notify("Study Dashboard", msg);
+      notifiedSet.add("rem:"+t.id);
+    }
+    if(now > due && !notifiedSet.has("over:"+t.id)){
+      toast("Overdue", `${t.title} was due at ${due.toLocaleTimeString()}`); notify("Overdue", t.title);
+      notifiedSet.add("over:"+t.id);
+    }
+  });
+}
+function notify(title, body){
+  if(!("Notification" in window)) return;
+  if(Notification.permission === "granted"){ new Notification(title, {body}); }
+  else if(Notification.permission === "default"){ Notification.requestPermission().then(p=>{ if(p==="granted") new Notification(title,{body}); }); }
+}
+tryRequestNotification();
+setInterval(checkReminders,30*1000); checkReminders();
+
+/* ----- streak logic ----- */
+function updateStreak(){
+  const today = new Date().toDateString();
+  if(state.lastCompletionDate === today) return;
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+  state.streak = (state.lastCompletionDate === yesterday.toDateString())? (state.streak||0)+1 : 1;
+  state.lastCompletionDate = today;
+  // bonus reward on streak milestone
+  if(state.streak && (state.streak % 7 === 0)){
+    toast("Streak milestone!", `You've hit ${state.streak} days — take a reward!`);
+    notify("Streak milestone", `You've hit ${state.streak} days`);
+  }
+}
+
+/* ----- periodic UI updates ----- */
+setInterval(()=>{ renderClock(); }, 1000);
+renderAll();
+
+/* ----- utility ----- */
+function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
+
+// ensure state saved to localStorage on unload
+window.addEventListener("beforeunload", ()=> saveState());
+
+// request notifications
+function tryRequestNotification(){ if("Notification" in window && Notification.permission === "default") Notification.requestPermission(); }
+
+/* ----- initial save if not present ----- */
+if(!localStorage.getItem(STORAGE_KEY)) { saveState(); }
+
+</script>
+</body>
+</html>
