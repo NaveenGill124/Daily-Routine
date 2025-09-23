@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -54,7 +53,7 @@
 
     .task-list{display:flex;flex-direction:column;gap:8px;margin-top:12px}
     .task{display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;background:var(--glass);border:1px solid rgba(255,255,255,0.02)}
-    .task .title{flex:1;font-weight:600}
+    .task .title{flex:1;font-weight:600;word-break:break-word}
     .task.done{opacity:0.55;text-decoration:line-through}
     .meta{font-size:12px;color:var(--muted)}
 
@@ -105,8 +104,8 @@
       <section class="card">
         <h3 style="margin-top:0">Today's Mission</h3>
         <div class="task-inputs">
-          <input id="taskTitle" class="input" placeholder="Task title (e.g., BST video + 2 problems)" style="flex:1" />
-          <select id="taskCategory" class="input" style="width:150px">
+          <input id="taskTitle" class="input" placeholder="Task title (e.g., BST video + 2 problems)" style="flex:1" aria-label="Task title"/>
+          <select id="taskCategory" class="input" style="width:150px" aria-label="Task category">
             <option value="General">General</option>
             <option value="DSA">DSA</option>
             <option value="OOP">OOP</option>
@@ -116,9 +115,9 @@
             <option value="AI">AI/Agents</option>
             <option value="PhD">PhD Apps</option>
           </select>
-          <input id="taskDue" class="input" type="datetime-local" style="width:210px"/>
-          <input id="taskRem" class="input" type="number" min="0" placeholder="rem min" style="width:100px"/>
-          <button id="addTaskBtn" class="btn small">Add</button>
+          <input id="taskDue" class="input" type="datetime-local" style="width:210px" aria-label="Task due date"/>
+          <input id="taskRem" class="input" type="number" min="0" placeholder="rem min" style="width:100px" aria-label="Reminder minutes"/>
+          <button id="addTaskBtn" class="btn small" aria-label="Add new task">Add</button>
         </div>
 
         <div style="display:flex;gap:8px;margin-top:12px">
@@ -183,6 +182,71 @@
 
     <div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
   </div>
+
+<script>
+/* ----- Utility first (genId must come before defaultState) ----- */
+function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+/* ----- Daily Motivational Quote ----- */
+const quotes = [
+  "Push yourself, because no one else will do it for you.",
+  "Dreams don’t work unless you do.",
+  "Stay consistent, even when it’s hard.",
+  "Every expert was once a beginner.",
+  "Focus on progress, not perfection.",
+  "Small steps each day lead to big results.",
+  "Discipline beats motivation.",
+  "Your only limit is you.",
+  "Do it now. Sometimes ‘later’ becomes ‘never’.",
+  "Hard work compounds — keep stacking!",
+  "Consistency creates momentum.",
+  "Win the morning, win the day."
+];
+
+function setDailyQuote(){
+  const todayIndex = new Date().getDate() % quotes.length;
+  document.getElementById("dailyQuote").textContent = `"${quotes[todayIndex]}"`;
+}
+setDailyQuote();
+const now = new Date();
+const msUntilMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 0,0,0) - now;
+setTimeout(()=>{ setDailyQuote(); setInterval(setDailyQuote, 86400000); }, msUntilMidnight);
+
+const STORAGE_KEY = "focusSprint_v2";
+
+function todayTimeStr(hm){
+  const d=new Date(); const [hh,mm]=hm.split(":");
+  d.setHours(parseInt(hh,10),parseInt(mm,10),0,0);
+  return toLocalInput(d);
+}
+function toLocalInput(d){
+  const pad=n=>n<10? "0"+n: n;
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const defaultState = {
+  tasks: [
+    {id:genId(), title:"DSA practice (BST) - watch + 3 problems", category:"DSA", due: todayTimeStr("09:00"), remMin:15, done:false},
+    {id:genId(), title:"Core CS: OOP video (chunk)", category:"OOP", due: todayTimeStr("11:15"), remMin:10, done:false},
+    {id:genId(), title:"GenAI - Transformers video + notebook", category:"AI", due: todayTimeStr("15:00"), remMin:15, done:false},
+    {id:genId(), title:"PhD applications (1 hr) — draft emails", category:"PhD", due: todayTimeStr("20:30"), remMin:30, done:false},
+    {id:genId(), title:"Night: DSA revision & LeetCode", category:"DSA", due: todayTimeStr("22:00"), remMin:10, done:false}
+  ],
+  notes: "Start each session by reviewing yesterday's notes.",
+  phdLinks: [],
+  rewards: [{id:genId(), text:"Ice cream (small)", earned:false},{id:genId(), text:"Movie night", earned:false}],
+  schedule: [
+    {time:"09:00-11:00", desc:"DSA Practice (2 hrs)"},
+    {time:"11:15-13:00", desc:"Core CS (1.5 hrs)"},
+    {time:"15:00-17:00", desc:"GenAI (2 hrs)"},
+    {time:"17:15-17:30", desc:"Quick Revision (15 min)"},
+    {time:"20:30-21:30", desc:"PhD Applications (1 hr)"},
+    {time:"22:00-02:00", desc:"Night block: DSA / Core CS / Agents (4 hrs)"},
+  ],
+  streak:0,
+  lastCompletionDate: null
+};
+
 
 <script>
 /* Focus Sprint — integrated JS
@@ -592,3 +656,5 @@ if(!localStorage.getItem(STORAGE_KEY)) { saveState(); }
 </script>
 </body>
 </html>
+
+
