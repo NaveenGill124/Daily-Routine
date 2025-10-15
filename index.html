@@ -65,10 +65,6 @@
     .small-muted{font-size:13px;color:var(--muted)}
     .toast-wrap{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:9999}
 
-    .schedule-rows{display:flex;flex-direction:column;gap:8px;margin-top:8px}
-    .sche{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.02)}
-    .time{font-weight:700;color:#06b6d4}
-
     footer{grid-column:1/-1;margin-top:8px;color:var(--muted);font-size:13px;text-align:center}
 
     @media (max-width:1024px){ .container{grid-template-columns:1fr} }
@@ -184,518 +180,361 @@
   </div>
 
 <script>
-/* ----- Utility first (genId must come before defaultState) ----- */
-/* ----- Utility ----- */
-function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+(function() {
+  'use strict';
 
-function todayTimeStr(hm){
-  const d=new Date(); const [hh,mm]=hm.split(":");
-  d.setHours(parseInt(hh,10),parseInt(mm,10),0,0);
-  return toLocalInput(d);
-}
-function toLocalInput(d){
-  const pad=n=>n<10? "0"+n: n;
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+  /* ----- 1. STATE & CONFIGURATION ----- */
+  const STORAGE_KEY = "focusSprint_v2";
 
-function escape(s){ if(!s) return ""; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function escapeAttr(s){ return escape(s).replace(/"/g,'&quot;'); }
+  const quotes = [
+    "Push yourself, because no one else will do it for you.",
+    "Dreams don’t work unless you do.",
+    "Stay consistent, even when it’s hard.",
+    "Every expert was once a beginner.",
+    "Focus on progress, not perfection.",
+    "Small steps each day lead to big results.",
+    "Discipline beats motivation.",
+    "Your only limit is you.",
+    "Do it now. Sometimes ‘later’ becomes ‘never’.",
+    "Hard work compounds — keep stacking!",
+    "Consistency creates momentum.",
+    "Win the morning, win the day."
+  ];
 
-function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
+  const SUBJECTS = {
+    DSA: { totalHours: 60, color: '#f59e0b' },
+    OOP: { totalHours: 5, color: '#8b5cf6' },
+    DBMS: { totalHours: 12, color: '#06b6d4' },
+    OS: { totalHours: 15, color: '#ec4899' },
+    CN: { totalHours: 5, color: '#3b82f6' },
+    AI: { totalHours: 42, color: '#f97316' },
+    PhD: { totalHours: 20, color: '#7c3aed' },
+    General: { totalHours: 20, color: '#94a3b8' }
+  };
 
-/* ----- Daily Quote ----- */
-const quotes = [
-  "Push yourself, because no one else will do it for you.",
-  "Dreams don’t work unless you do.",
-  "Stay consistent, even when it’s hard.",
-  "Every expert was once a beginner.",
-  "Focus on progress, not perfection.",
-  "Small steps each day lead to big results.",
-  "Discipline beats motivation.",
-  "Your only limit is you.",
-  "Do it now. Sometimes ‘later’ becomes ‘never’.",
-  "Hard work compounds — keep stacking!",
-  "Consistency creates momentum.",
-  "Win the morning, win the day."
-];
-function setDailyQuote(){
-  const todayIndex = new Date().getDate() % quotes.length;
-  document.getElementById("dailyQuote").textContent = `"${quotes[todayIndex]}"`;
-}
-setDailyQuote();
-const now = new Date();
-const msUntilMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1,0,0,0)-now;
-setTimeout(()=>{ setDailyQuote(); setInterval(setDailyQuote,86400000); }, msUntilMidnight);
+  const defaultState = {
+    tasks: [
+      {id:genId(), title:"DSA practice (BST) - watch + 3 problems", category:"DSA", due: todayTimeStr("09:00"), remMin:15, done:false},
+      {id:genId(), title:"Core CS: OOP video (chunk)", category:"OOP", due: todayTimeStr("11:15"), remMin:10, done:false},
+      {id:genId(), title:"GenAI - Transformers video + notebook", category:"AI", due: todayTimeStr("15:00"), remMin:15, done:false},
+      {id:genId(), title:"PhD applications (1 hr) — draft emails", category:"PhD", due: todayTimeStr("20:30"), remMin:30, done:false},
+      {id:genId(), title:"Night: DSA revision & LeetCode", category:"DSA", due: todayTimeStr("22:00"), remMin:10, done:false}
+    ],
+    notes: "Start each session by reviewing yesterday's notes.",
+    phdLinks: [],
+    rewards: [{id:genId(), text:"Ice cream (small)", earned:false},{id:genId(), text:"Movie night", earned:false}],
+    schedule: [
+      {time:"09:00-11:00", desc:"DSA Practice (2 hrs)"},
+      {time:"11:15-13:00", desc:"Core CS (1.5 hrs)"},
+      {time:"15:00-17:00", desc:"GenAI (2 hrs)"},
+      {time:"17:15-17:30", desc:"Quick Revision (15 min)"},
+      {time:"20:30-21:30", desc:"PhD Applications (1 hr)"},
+      {time:"22:00-02:00", desc:"Night block: DSA / Core CS / Agents (4 hrs)"}
+    ],
+    streak:0,
+    lastCompletionDate: null
+  };
+  
+  let notifiedSet = new Set();
+  let state = loadState();
 
-/* ----- Storage & State ----- */
-const STORAGE_KEY = "focusSprint_v2";
-
-const defaultState = {
-  tasks: [
-    {id:genId(), title:"DSA practice (BST) - watch + 3 problems", category:"DSA", due: todayTimeStr("09:00"), remMin:15, done:false},
-    {id:genId(), title:"Core CS: OOP video (chunk)", category:"OOP", due: todayTimeStr("11:15"), remMin:10, done:false},
-    {id:genId(), title:"GenAI - Transformers video + notebook", category:"AI", due: todayTimeStr("15:00"), remMin:15, done:false},
-    {id:genId(), title:"PhD applications (1 hr) — draft emails", category:"PhD", due: todayTimeStr("20:30"), remMin:30, done:false},
-    {id:genId(), title:"Night: DSA revision & LeetCode", category:"DSA", due: todayTimeStr("22:00"), remMin:10, done:false}
-  ],
-  notes: "Start each session by reviewing yesterday's notes.",
-  phdLinks: [],
-  rewards: [{id:genId(), text:"Ice cream (small)", earned:false},{id:genId(), text:"Movie night", earned:false}],
-  schedule: [
-    {time:"09:00-11:00", desc:"DSA Practice (2 hrs)"},
-    {time:"11:15-13:00", desc:"Core CS (1.5 hrs)"},
-    {time:"15:00-17:00", desc:"GenAI (2 hrs)"},
-    {time:"17:15-17:30", desc:"Quick Revision (15 min)"},
-    {time:"20:30-21:30", desc:"PhD Applications (1 hr)"},
-    {time:"22:00-02:00", desc:"Night block: DSA / Core CS / Agents (4 hrs)"}
-  ],
-  streak:0,
-  lastCompletionDate: null
-};
-
-let state = loadState();
-function loadState(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw){ localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultState)); return JSON.parse(JSON.stringify(defaultState)); }
-    return JSON.parse(raw);
-  }catch(e){ console.error(e); localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultState)); return JSON.parse(JSON.stringify(defaultState)); }
-}
-function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); renderAll(); }
-
-/* ----- Streak Logic ----- */
-function checkAndResetStreak(){
-  if(!state.lastCompletionDate){ state.streak=0; return; }
-  const today = new Date().toDateString();
-  const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
-  const yStr = yesterday.toDateString();
-  if(state.lastCompletionDate !== today && state.lastCompletionDate !== yStr) state.streak=0;
-}
-function updateStreak(){
-  const todayStr = new Date().toDateString();
-  if(state.lastCompletionDate === todayStr) return;
-  const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
-  const yStr = yesterday.toDateString();
-  state.streak = (state.lastCompletionDate === yStr) ? (state.streak||0)+1 : 1;
-  state.lastCompletionDate = todayStr;
-  saveState(); // <-- ensure streak is saved
-  if(state.streak && state.streak%7===0){ toast("Streak milestone!", `You've hit ${state.streak} days — take a reward!`); notify("Streak milestone", `You've hit ${state.streak} days`); }
-}
-
-/* ----- Initial Render ----- */
-checkAndResetStreak();
-renderAll();
-setInterval(()=>renderClock(),1000);
-
-
-
-<script>
-/* Focus Sprint — integrated JS
-    Features:
-    - tasks: add/edit/delete/check, due + reminder (minutes before)
-    - progress per subject estimated from completed tasks
-    - notes autosave
-    - PhD links (add/edit/delete)
-    - rewards (add/earn/delete)
-    - export/import JSON backup
-    - prefilled schedule & template loader
-    - toasts and browser notifications
-    - localStorage persistence
-*/
-
-/* ----- Daily Motivational Quote ----- */
-const quotes = [
-  "Push yourself, because no one else will do it for you.",
-  "Dreams don’t work unless you do.",
-  "Stay consistent, even when it’s hard.",
-  "Every expert was once a beginner.",
-  "Focus on progress, not perfection.",
-  "Small steps each day lead to big results.",
-  "Discipline beats motivation.",
-  "Your only limit is you.",
-  "Do it now. Sometimes ‘later’ becomes ‘never’.",
-  "Hard work compounds — keep stacking!",
-  "Consistency creates momentum.",
-  "Win the morning, win the day."
-];
-
-function setDailyQuote(){
-  const todayIndex = new Date().getDate() % quotes.length;
-  document.getElementById("dailyQuote").textContent = `"${quotes[todayIndex]}"`;
-}
-setDailyQuote();
-
-// auto-refresh quote at midnight
-const now = new Date();
-const msUntilMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 0,0,0) - now;
-setTimeout(()=>{ setDailyQuote(); setInterval(setDailyQuote, 86400000); }, msUntilMidnight);
-
-
-const STORAGE_KEY = "focusSprint_v2";
-
-const defaultState = {
-  tasks: [
-    // sample tasks for today's schedule
-    {id:genId(), title:"DSA practice (BST) - watch + 3 problems", category:"DSA", due: todayTimeStr("09:00"), remMin:15, done:false},
-    {id:genId(), title:"Core CS: OOP video (chunk)", category:"OOP", due: todayTimeStr("11:15"), remMin:10, done:false},
-    {id:genId(), title:"GenAI - Transformers video + notebook", category:"AI", due: todayTimeStr("15:00"), remMin:15, done:false},
-    {id:genId(), title:"PhD applications (1 hr) — draft emails", category:"PhD", due: todayTimeStr("20:30"), remMin:30, done:false},
-    {id:genId(), title:"Night: DSA revision & LeetCode", category:"DSA", due: todayTimeStr("22:00"), remMin:10, done:false}
-  ],
-  notes: "Start each session by reviewing yesterday's notes.",
-  phdLinks: [],
-  rewards: [{id:genId(), text:"Ice cream (small)", earned:false},{id:genId(), text:"Movie night", earned:false}],
-  schedule: [
-    {time:"09:00-11:00", desc:"DSA Practice (2 hrs)"},
-    {time:"11:15-13:00", desc:"Core CS (1.5 hrs)"},
-    {time:"15:00-17:00", desc:"GenAI (2 hrs)"},
-    {time:"17:15-17:30", desc:"Quick Revision (15 min)"},
-    {time:"20:30-21:30", desc:"PhD Applications (1 hr)"},
-    {time:"22:00-02:00", desc:"Night block: DSA / Core CS / Agents (4 hrs)"},
-  ],
-  streak:0,
-  lastCompletionDate: null
-};
-
-// subject configs for progress calculation
-const SUBJECTS = {
-  DSA: { totalHours: 60, color: '#f59e0b' },
-  OOP: { totalHours: 5, color: '#8b5cf6' },
-  DBMS: { totalHours: 12, color: '#06b6d4' },
-  OS: { totalHours: 15, color: '#ec4899' },
-  CN: { totalHours: 5, color: '#3b82f6' },
-  AI: { totalHours: 42, color: '#f97316' },
-  PhD: { totalHours: 20, color: '#7c3aed' },
-  General: { totalHours: 20, color: '#94a3b8' }
-};
-
-let state = loadState();
-
-function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
-function todayTimeStr(hm){
-  const d=new Date(); const [hh,mm]=hm.split(":");
-  d.setHours(parseInt(hh,10),parseInt(mm,10),0,0);
-  return toLocalInput(d);
-}
-function toLocalInput(d){
-  const pad=n=>n<10? "0"+n: n;
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-function loadState(){
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if(!raw){ localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultState)); return JSON.parse(JSON.stringify(defaultState)); }
-    return JSON.parse(raw);
-  }catch(e){ console.error(e); localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultState)); return JSON.parse(JSON.stringify(defaultState)); }
-}
-function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); renderAll(); }
-
-/* ----- DOM refs ----- */
-const $ = s=>document.querySelector(s);
-const taskListEl = $("#taskList");
-const progressGrid = $("#progressGrid");
-const notesArea = $("#notesArea");
-const nowClock = $("#nowClock");
-const streakCountEl = $("#streakCount");
-const toastWrap = $("#toastWrap");
-const phdListEl = $("#phdList");
-const rewardsEl = $("#rewards");
-
-/* ----- Renderers ----- */
-function renderAll(){
-  renderClock();
-  renderProgress();
-  renderTasks();
-  renderNotes();
-  renderPhdLinks();
-  renderRewards();
-  renderStreak();
-}
-function renderClock(){
-  const d=new Date(); nowClock.textContent = d.toLocaleString();
-}
-function renderProgress(){
-  progressGrid.innerHTML = "";
-  // compute completed hours per subject:  each completed task counted as 1.5 hours (approx)
-  const completed = {};
-  Object.keys(SUBJECTS).forEach(k=>completed[k]=0);
-  (state.tasks||[]).forEach(t=>{ if(t.done){ const cat = t.category || "General"; completed[cat] = (completed[cat]||0) + 1.5; }});
-  for(const s in SUBJECTS){
-    const conf = SUBJECTS[s];
-    const hours = completed[s] || 0;
-    const pct = Math.min(100, Math.round((hours / conf.totalHours)*100));
-    const card = document.createElement("div");
-    card.className = "progress-card card";
-    card.innerHTML = `<h4>${s}<span class="small-muted">${hours.toFixed(1)} / ${conf.totalHours} hrs</span></h4>
-      <div class="progress-bar"><div class="progress-inner" style="width:${pct}%; background:${conf.color}"></div></div>`;
-    progressGrid.appendChild(card);
-  }
-}
-function renderTasks(){
-  if(!state.tasks || state.tasks.length===0){
-    taskListEl.innerHTML = '<div class="small-muted">No tasks yet — add one above.</div>'; return;
-  }
-  // sort by done then due
-  const arr = state.tasks.slice().sort((a,b)=> (a.done - b.done) || (new Date(a.due||0) - new Date(b.due||0)));
-  taskListEl.innerHTML = "";
-  arr.forEach(t=>{
-    const row = document.createElement("div");
-    row.className = "task"+(t.done? " done":"");
-    row.innerHTML = `
-      <input type="checkbox" ${t.done? "checked":""} data-id="${t.id}" aria-label="done-${t.title}" />
-      <div style="flex:1">
-        <div class="title">${escape(t.title)} <span class="small-muted" style="font-weight:400">[${t.category||'General'}]</span></div>
-        <div class="meta">${t.due? new Date(t.due).toLocaleString() : 'No due'} · ${t.remMin? t.remMin+'m before':''}</div>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn-muted small" data-edit="${t.id}">Edit</button>
-        <button class="btn small" data-del="${t.id}" style="background:linear-gradient(90deg,#ef4444,#f43f5e)">Delete</button>
-      </div>`;
-    // checkbox listener
-    row.querySelector(`input[type="checkbox"]`).addEventListener("change", e=>{
-      t.done = e.target.checked;
-      if(t.done) updateStreak();
-      saveState();
-    });
-    row.querySelector(`[data-edit="${t.id}"]`).addEventListener("click", ()=> editTask(t.id));
-    row.querySelector(`[data-del="${t.id}"]`).addEventListener("click", ()=> {
-      if(!confirm("Delete this task?")) return;
-      state.tasks = state.tasks.filter(x=>x.id!==t.id); saveState(); toast("Task deleted");
-    });
-    taskListEl.appendChild(row);
-  });
-}
-function renderNotes(){ notesArea.value = state.notes || ""; }
-function renderPhdLinks(){
-  phdListEl.innerHTML = "";
-  if(!state.phdLinks || state.phdLinks.length===0) { phdListEl.innerHTML = '<div class="small-muted">No PhD links saved.</div>'; return; }
-  state.phdLinks.forEach(l=>{
-    const el = document.createElement("div"); el.className="row";
-    el.innerHTML = `<div style="flex:1"><a class="phd-link" href="${escapeAttr(l.url)}" target="_blank" rel="noopener">${escape(l.title)}</a>
-      <div class="small-muted" style="margin-top:6px">${escape(l.url)}</div></div>
-      <div style="display:flex;gap:8px">
-        <button class="btn-muted small" data-edit="${l.id}">Edit</button>
-        <button class="btn small" data-del="${l.id}" style="background:linear-gradient(90deg,#ef4444,#f43f5e)">Delete</button>
-      </div>`;
-    el.querySelector(`[data-edit="${l.id}"]`).addEventListener("click", ()=>{
-      const newT = prompt("Edit title", l.title); if(newT===null) return;
-      const newU = prompt("Edit URL", l.url); if(newU===null) return;
-      l.title = newT; l.url = newU; saveState(); toast("Link updated");
-    });
-    el.querySelector(`[data-del="${l.id}"]`).addEventListener("click", ()=>{
-      if(!confirm("Remove this link?")) return;
-      state.phdLinks = state.phdLinks.filter(x=>x.id!==l.id); saveState(); toast("Link removed");
-    });
-    phdListEl.appendChild(el);
-  });
-}
-function renderRewards(){
-  rewardsEl.innerHTML = "";
-  if(!state.rewards || state.rewards.length===0){ rewardsEl.innerHTML = '<div class="small-muted">No rewards yet.</div>'; return; }
-  state.rewards.forEach(r=>{
-    const el = document.createElement("div"); el.className="row";
-    el.innerHTML = `<div style="flex:1"><strong ${r.earned? 'style="text-decoration:line-through;opacity:.6"':""}>${escape(r.text)}</strong>
-      <div class="small-muted">Click Earn to mark</div></div>
-      <div style="display:flex;gap:8px">
-        <button class="btn small" data-earn="${r.id}" style="background:linear-gradient(90deg,#10b981,#059669)">Earn</button>
-        <button class="btn-muted small" data-del="${r.id}">Delete</button>
-      </div>`;
-    el.querySelector(`[data-earn="${r.id}"]`).addEventListener("click", ()=>{
-      r.earned = !r.earned; saveState();
-      if(r.earned) { toast("Reward earned 🎉", r.text); notify("Reward earned", r.text); }
-    });
-    el.querySelector(`[data-del="${r.id}"]`).addEventListener("click", ()=>{
-      if(!confirm("Delete reward?")) return;
-      state.rewards = state.rewards.filter(x=>x.id!==r.id); saveState();
-    });
-    rewardsEl.appendChild(el);
-  });
-}
-function renderStreak(){ streakCountEl.textContent = state.streak || 0; }
-
-/* ----- helpers ----- */
-function escape(s){ if(!s) return ""; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function escapeAttr(s){ return escape(s).replace(/"/g,'&quot;'); }
-function toast(title, text=""){ const node=document.createElement("div"); node.className="card"; node.style.minWidth="240px"; node.innerHTML=`<strong>${escape(title)}</strong><div class="small-muted" style="margin-top:6px">${escape(text)}</div>`; toastWrap.prepend(node); setTimeout(()=>node.style.opacity=0,6000); setTimeout(()=>node.remove(),6800); }
-
-/* ----- event wiring ----- */
-document.getElementById("addTaskBtn").addEventListener("click", ()=>{
-  const title = document.getElementById("taskTitle").value.trim();
-  const cat = document.getElementById("taskCategory").value;
-  const due = document.getElementById("taskDue").value || null;
-  const remMin = parseInt(document.getElementById("taskRem").value || 0,10) || 0;
-  if(!title){ alert("Provide a title"); return; }
-  state.tasks.push({id:genId(), title, category:cat, due: due, remMin: remMin, done:false});
-  document.getElementById("taskTitle").value=""; document.getElementById("taskDue").value=""; document.getElementById("taskRem").value="";
-  saveState(); toast("Task added", title);
-});
-
-document.getElementById("clearDoneBtn").addEventListener("click", ()=>{
-  state.tasks = state.tasks.filter(t=>!t.done); saveState(); toast("Cleared completed tasks");
-});
-document.getElementById("runMock").addEventListener("click", ()=>{
-  const now = new Date(); const start = new Date(now.getTime()+10*60000); state.tasks.push({id:genId(), title:"1-hr Mock Test", category:"General", due: toLocalInput(start), remMin:5, done:false}); saveState(); toast("Mock scheduled");
-});
-
-document.getElementById("prefillSchedule").addEventListener("click", ()=>{
-  if(!confirm("Load today's schedule as tasks?")) return;
-  (state.schedule||[]).forEach(s=>{
-    const m = s.time.match(/(\d{2}:\d{2})/);
-    if(!m) return;
-    state.tasks.push({id:genId(), title:s.desc, category:"General", due: todayTimeStr(m[1]), remMin:15, done:false});
-  });
-  saveState(); toast("Schedule loaded");
-});
-
-document.getElementById("prefillTemplate").addEventListener("click", ()=>{
-  if(!confirm("Insert study template tasks?")) return;
-  // sample template tasks to help mapping video durations
-  const template = [
-    {title:"Watch OOP video (chunk)", category:"OOP"},
-    {title:"DBMS: normalization video (chunk)", category:"DBMS"},
-    {title:"OS: process & threads video (chunk)", category:"OS"},
-    {title:"GenAI: Transformers video + notebook", category:"AI"},
-    {title:"Agentic AI: LangChain intro", category:"AI"},
-    {title:"PhD: draft application email", category:"PhD"}
-  ];
-  const now = new Date();
-  template.forEach((t,i)=> state.tasks.push({id:genId(), title:t.title, category:t.category, due: toLocalInput(new Date(now.getTime() + (i+1)*3600000)), remMin:15, done:false}));
-  saveState(); toast("Template inserted");
-});
-
-/* ----- notes autosave ----- */
-const notesAreaEl = document.getElementById("notesArea");
-notesAreaEl.addEventListener("input", debounce(()=>{ state.notes = notesAreaEl.value; saveState(); }, 600));
-
-/* ----- phd links ----- */
-document.getElementById("addPhd").addEventListener("click", ()=>{
-  const t = document.getElementById("phdTitle").value.trim();
-  const u = document.getElementById("phdUrl").value.trim();
-  if(!t || !u){ alert("Provide title and url"); return; }
-  state.phdLinks = state.phdLinks || []; state.phdLinks.push({id:genId(), title:t, url:u}); document.getElementById("phdTitle").value=""; document.getElementById("phdUrl").value=""; saveState(); toast("PhD link added", t);
-});
-
-/* ----- rewards ----- */
-document.getElementById("addReward").addEventListener("click", ()=>{
-  const text = document.getElementById("rewText").value.trim(); if(!text) return alert("Add reward text");
-  state.rewards = state.rewards || []; state.rewards.push({id:genId(), text, earned:false}); document.getElementById("rewText").value=""; saveState(); toast("Reward added");
-});
-
-/* ----- export / import ----- */
-document.getElementById("exportDataBtn").addEventListener("click", ()=>{
-  const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`focus-sprint-backup-${new Date().toISOString().split('T')[0]}.json`; a.click(); URL.revokeObjectURL(a.href);
-});
-document.getElementById("importDataBtn").addEventListener("click", ()=> document.getElementById("importFileInput").click());
-document.getElementById("importFileInput").addEventListener("change", e=>{
-  const file = e.target.files[0]; if(!file) return;
-  const reader = new FileReader(); reader.onload = ev=>{
-    try{ const imported = JSON.parse(ev.target.result); state = {...defaultState, ...imported}; saveState(); toast("Data imported"); } catch(err){ alert("Invalid file"); }
-  }; reader.readAsText(file);
-});
-
-/* ----- task edit ----- */
-function editTask(id){
-  const t = state.tasks.find(x=>x.id===id); if(!t) return;
-  const newT = prompt("Edit title", t.title); if(newT===null) return;
-  const newDue = prompt("Due (YYYY-MM-DDTHH:MM) or empty", t.due||""); if(newDue===null) return;
-  const newRem = prompt("Reminder minutes before (0 none)", t.remMin||0); if(newRem===null) return;
-  t.title = newT.trim()||t.title; t.due = newDue.trim()||null; t.remMin = parseInt(newRem,10)||0; saveState(); toast("Task updated");
-}
-
-/* ----- reminders & notifications ----- */
-let notifiedSet = new Set();
-function checkReminders(){
-  const now = new Date();
-  (state.tasks||[]).forEach(t=>{
-    if(!t.due || t.done) return;
-    const due = new Date(t.due);
-    const remMin = parseInt(t.remMin||0,10);
-    const trigger = new Date(due.getTime() - remMin*60000);
-    if(now >= trigger && !notifiedSet.has("rem:"+t.id)){
-      const msg = `${t.title} — due at ${due.toLocaleTimeString()}`;
-      toast("Reminder", msg); notify("Study Dashboard", msg);
-      notifiedSet.add("rem:"+t.id);
-    }
-    if(now > due && !notifiedSet.has("over:"+t.id)){
-      toast("Overdue", `${t.title} was due at ${due.toLocaleTimeString()}`); notify("Overdue", t.title);
-      notifiedSet.add("over:"+t.id);
-    }
-  });
-}
-function notify(title, body){
-  if(!("Notification" in window)) return;
-  if(Notification.permission === "granted"){ new Notification(title, {body}); }
-  else if(Notification.permission === "default"){ Notification.requestPermission().then(p=>{ if(p==="granted") new Notification(title,{body}); }); }
-}
-tryRequestNotification();
-setInterval(checkReminders,30*1000); checkReminders();
-
-/* ----- streak logic ----- */
-/**
- * Checks if the streak was broken (i.e., no task completed yesterday)
- * and resets it to 0 if necessary. This runs on page load.
- */
-function checkAndResetStreak() {
-  if (!state.lastCompletionDate) {
-    state.streak = 0;
-    return;
+  /* ----- 2. UTILITY FUNCTIONS ----- */
+  function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+  function todayTimeStr(hm){
+    const d=new Date(); const [hh,mm]=hm.split(":");
+    d.setHours(parseInt(hh,10),parseInt(mm,10),0,0);
+    return toLocalInput(d);
   }
-  const todayStr = new Date().toDateString();
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toDateString();
-
-  // If the last completion was not today and not yesterday, the streak is broken.
-  if (state.lastCompletionDate !== todayStr && state.lastCompletionDate !== yesterdayStr) {
-    state.streak = 0;
+  function toLocalInput(d){
+    const pad=n=>n<10? "0"+n: n;
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
-}
+  function escape(s){ if(!s) return ""; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function escapeAttr(s){ return escape(s).replace(/"/g,'&quot;'); }
+  function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
 
-/**
- * Updates the streak when a task is marked as complete.
- */
-function updateStreak(){
-  const todayStr = new Date().toDateString();
-  // If a task was already completed today, don't update the streak again.
-  if(state.lastCompletionDate === todayStr) return;
+  /* ----- 3. DOM REFERENCES ----- */
+  const $ = s=>document.querySelector(s);
+  const taskListEl = $("#taskList");
+  const progressGrid = $("#progressGrid");
+  const notesArea = $("#notesArea");
+  const nowClock = $("#nowClock");
+  const streakCountEl = $("#streakCount");
+  const toastWrap = $("#toastWrap");
+  const phdListEl = $("#phdList");
+  const rewardsEl = $("#rewards");
 
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate()-1);
-  const yesterdayStr = yesterday.toDateString();
+  /* ----- 4. CORE LOGIC (State, Streak, Notifications) ----- */
+  function loadState(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if(!raw){ return JSON.parse(JSON.stringify(defaultState)); }
+      return JSON.parse(raw);
+    }catch(e){ console.error(e); return JSON.parse(JSON.stringify(defaultState)); }
+  }
+  function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); renderAll(); }
 
-  // If the last completion was yesterday, it's a combo! Increment the streak.
-  // Otherwise, the streak was broken or just starting, so set it to 1.
-  state.streak = (state.lastCompletionDate === yesterdayStr) ? (state.streak || 0) + 1 : 1;
-  state.lastCompletionDate = todayStr;
+  function checkAndResetStreak() {
+    if (!state.lastCompletionDate) {
+      state.streak = 0;
+      return;
+    }
+    const todayStr = new Date().toDateString();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toDateString();
+    if (state.lastCompletionDate !== todayStr && state.lastCompletionDate !== yesterdayStr) {
+      state.streak = 0;
+    }
+  }
 
-  // Bonus reward on streak milestone
-  if(state.streak && (state.streak % 7 === 0)){
-    toast("Streak milestone!", `You've hit ${state.streak} days — take a reward!`);
-    notify("Streak milestone", `You've hit ${state.streak} days`);
-  }
-}
+  function updateStreak(){
+    const todayStr = new Date().toDateString();
+    if(state.lastCompletionDate === todayStr) return;
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate()-1);
+    const yesterdayStr = yesterday.toDateString();
+    state.streak = (state.lastCompletionDate === yesterdayStr) ? (state.streak || 0) + 1 : 1;
+    state.lastCompletionDate = todayStr;
+    if(state.streak && (state.streak % 7 === 0)){
+      toast("Streak milestone!", `You've hit ${state.streak} days — take a reward!`);
+      notify("Streak milestone", `You've hit ${state.streak} days`);
+    }
+    // No need to call saveState() here, as the event handler that calls this function already does.
+  }
 
+  function notify(title, body){
+    if(!("Notification" in window)) return;
+    if(Notification.permission === "granted"){ new Notification(title, {body}); }
+    else if(Notification.permission === "default"){ Notification.requestPermission().then(p=>{ if(p==="granted") new Notification(title,{body}); }); }
+  }
 
-/* ----- periodic UI updates ----- */
-setInterval(()=>{ renderClock(); }, 1000);
+  function checkReminders(){
+    const now = new Date();
+    (state.tasks||[]).forEach(t=>{
+      if(!t.due || t.done) return;
+      const due = new Date(t.due);
+      const remMin = parseInt(t.remMin||0,10);
+      const trigger = new Date(due.getTime() - remMin*60000);
+      if(now >= trigger && !notifiedSet.has("rem:"+t.id)){
+        const msg = `${t.title} — due at ${due.toLocaleTimeString()}`;
+        toast("Reminder", msg); notify("Study Dashboard", msg);
+        notifiedSet.add("rem:"+t.id);
+      }
+      if(now > due && !notifiedSet.has("over:"+t.id)){
+        toast("Overdue", `${t.title} was due at ${due.toLocaleTimeString()}`); notify("Overdue", t.title);
+        notifiedSet.add("over:"+t.id);
+      }
+    });
+  }
+  
+  function tryRequestNotification(){ if("Notification" in window && Notification.permission === "default") Notification.requestPermission(); }
+  function toast(title, text=""){ const node=document.createElement("div"); node.className="card"; node.style.minWidth="240px"; node.innerHTML=`<strong>${escape(title)}</strong><div class="small-muted" style="margin-top:6px">${escape(text)}</div>`; toastWrap.prepend(node); setTimeout(()=>node.style.opacity=0,6000); setTimeout(()=>node.remove(),6800); }
 
-checkAndResetStreak(); // <-- KEY CHANGE: Check streak on page load
-renderAll();
+  /* ----- 5. RENDER FUNCTIONS ----- */
+  function renderAll(){
+    renderClock();
+    renderProgress();
+    renderTasks();
+    renderNotes();
+    renderPhdLinks();
+    renderRewards();
+    renderStreak();
+  }
+  function renderClock(){
+    const d=new Date(); nowClock.textContent = d.toLocaleString();
+  }
+  function renderProgress(){
+    progressGrid.innerHTML = "";
+    const completed = {};
+    Object.keys(SUBJECTS).forEach(k=>completed[k]=0);
+    (state.tasks||[]).forEach(t=>{ if(t.done){ const cat = t.category || "General"; completed[cat] = (completed[cat]||0) + 1.5; }});
+    for(const s in SUBJECTS){
+      const conf = SUBJECTS[s];
+      const hours = completed[s] || 0;
+      const pct = Math.min(100, Math.round((hours / conf.totalHours)*100));
+      const card = document.createElement("div");
+      card.className = "progress-card card";
+      card.innerHTML = `<h4>${s}<span class="small-muted">${hours.toFixed(1)} / ${conf.totalHours} hrs</span></h4>
+        <div class="progress-bar"><div class="progress-inner" style="width:${pct}%; background:${conf.color}"></div></div>`;
+      progressGrid.appendChild(card);
+    }
+  }
+  function renderTasks(){
+    if(!state.tasks || state.tasks.length===0){
+      taskListEl.innerHTML = '<div class="small-muted">No tasks yet — add one above.</div>'; return;
+    }
+    const arr = state.tasks.slice().sort((a,b)=> (a.done - b.done) || (new Date(a.due||0) - new Date(b.due||0)));
+    taskListEl.innerHTML = "";
+    arr.forEach(t=>{
+      const row = document.createElement("div");
+      row.className = "task"+(t.done? " done":"");
+      row.innerHTML = `
+        <input type="checkbox" ${t.done? "checked":""} data-id="${t.id}" aria-label="Mark task as done: ${escapeAttr(t.title)}" />
+        <div style="flex:1">
+          <div class="title">${escape(t.title)} <span class="small-muted" style="font-weight:400">[${t.category||'General'}]</span></div>
+          <div class="meta">${t.due? new Date(t.due).toLocaleString() : 'No due date'} · ${t.remMin? t.remMin+'m reminder':''}</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-muted small" data-edit="${t.id}">Edit</button>
+          <button class="btn small" data-del="${t.id}" style="background:linear-gradient(90deg,#ef4444,#f43f5e)">Delete</button>
+        </div>`;
+      row.querySelector(`input[type="checkbox"]`).addEventListener("change", e=>{
+        const task = state.tasks.find(x => x.id === t.id);
+        if (task) {
+          task.done = e.target.checked;
+          if(task.done) updateStreak();
+          saveState();
+        }
+      });
+      row.querySelector(`[data-edit="${t.id}"]`).addEventListener("click", ()=> editTask(t.id));
+      row.querySelector(`[data-del="${t.id}"]`).addEventListener("click", ()=> {
+        if(!confirm("Delete this task?")) return;
+        state.tasks = state.tasks.filter(x=>x.id!==t.id); saveState(); toast("Task deleted");
+      });
+      taskListEl.appendChild(row);
+    });
+  }
+  function renderNotes(){ notesArea.value = state.notes || ""; }
+  function renderPhdLinks(){
+    phdListEl.innerHTML = "";
+    if(!state.phdLinks || state.phdLinks.length===0) { phdListEl.innerHTML = '<div class="small-muted">No PhD links saved.</div>'; return; }
+    state.phdLinks.forEach(l=>{
+      const el = document.createElement("div"); el.className="row";
+      el.innerHTML = `<div style="flex:1"><a class="phd-link" href="${escapeAttr(l.url)}" target="_blank" rel="noopener">${escape(l.title)}</a>
+        <div class="small-muted" style="margin-top:6px">${escape(l.url)}</div></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-muted small" data-edit="${l.id}">Edit</button>
+          <button class="btn small" data-del="${l.id}" style="background:linear-gradient(90deg,#ef4444,#f43f5e)">Delete</button>
+        </div>`;
+      el.querySelector(`[data-edit="${l.id}"]`).addEventListener("click", ()=>{
+        const newT = prompt("Edit title", l.title); if(newT===null) return;
+        const newU = prompt("Edit URL", l.url); if(newU===null) return;
+        l.title = newT; l.url = newU; saveState(); toast("Link updated");
+      });
+      el.querySelector(`[data-del="${l.id}"]`).addEventListener("click", ()=>{
+        if(!confirm("Remove this link?")) return;
+        state.phdLinks = state.phdLinks.filter(x=>x.id!==l.id); saveState(); toast("Link removed");
+      });
+      phdListEl.appendChild(el);
+    });
+  }
+  function renderRewards(){
+    rewardsEl.innerHTML = "";
+    if(!state.rewards || state.rewards.length===0){ rewardsEl.innerHTML = '<div class="small-muted">No rewards yet.</div>'; return; }
+    state.rewards.forEach(r=>{
+      const el = document.createElement("div"); el.className="row";
+      el.innerHTML = `<div style="flex:1"><strong ${r.earned? 'style="text-decoration:line-through;opacity:.6"':""}>${escape(r.text)}</strong>
+        <div class="small-muted">Click Earn to mark</div></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn small" data-earn="${r.id}" style="background:linear-gradient(90deg,#10b981,#059669)">Earn</button>
+          <button class="btn-muted small" data-del="${r.id}">Delete</button>
+        </div>`;
+      el.querySelector(`[data-earn="${r.id}"]`).addEventListener("click", ()=>{
+        r.earned = !r.earned; saveState();
+        if(r.earned) { toast("Reward earned 🎉", r.text); notify("Reward earned", r.text); }
+      });
+      el.querySelector(`[data-del="${r.id}"]`).addEventListener("click", ()=>{
+        if(!confirm("Delete reward?")) return;
+        state.rewards = state.rewards.filter(x=>x.id!==r.id); saveState();
+      });
+      rewardsEl.appendChild(el);
+    });
+  }
+  function renderStreak(){ streakCountEl.textContent = state.streak || 0; }
+  
+  function editTask(id){
+    const t = state.tasks.find(x=>x.id===id); if(!t) return;
+    const newT = prompt("Edit title", t.title); if(newT===null) return;
+    const newDue = prompt("Due (YYYY-MM-DDTHH:MM) or empty", t.due||""); if(newDue===null) return;
+    const newRem = prompt("Reminder minutes before (0 none)", t.remMin||0); if(newRem===null) return;
+    t.title = newT.trim()||t.title; t.due = newDue.trim()||null; t.remMin = parseInt(newRem,10)||0; saveState(); toast("Task updated");
+  }
 
+  /* ----- 6. EVENT LISTENERS ----- */
+  $("#addTaskBtn").addEventListener("click", ()=>{
+    const title = $("#taskTitle").value.trim();
+    const cat = $("#taskCategory").value;
+    const due = $("#taskDue").value || null;
+    const remMin = parseInt($("#taskRem").value || 0,10) || 0;
+    if(!title){ alert("Provide a title"); return; }
+    state.tasks.push({id:genId(), title, category:cat, due: due, remMin: remMin, done:false});
+    $("#taskTitle").value=""; $("#taskDue").value=""; $("#taskRem").value="";
+    saveState(); toast("Task added", title);
+  });
 
-/* ----- utility ----- */
-function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
+  $("#clearDoneBtn").addEventListener("click", ()=>{ state.tasks = state.tasks.filter(t=>!t.done); saveState(); toast("Cleared completed tasks"); });
+  $("#runMock").addEventListener("click", ()=>{ const now = new Date(); const start = new Date(now.getTime()+10*60000); state.tasks.push({id:genId(), title:"1-hr Mock Test", category:"General", due: toLocalInput(start), remMin:5, done:false}); saveState(); toast("Mock scheduled"); });
+  
+  $("#prefillSchedule").addEventListener("click", ()=>{
+    if(!confirm("Load today's schedule as tasks?")) return;
+    (state.schedule||[]).forEach(s=>{
+      const m = s.time.match(/(\d{2}:\d{2})/);
+      if(!m) return;
+      state.tasks.push({id:genId(), title:s.desc, category:"General", due: todayTimeStr(m[1]), remMin:15, done:false});
+    });
+    saveState(); toast("Schedule loaded");
+  });
 
-// ensure state saved to localStorage on unload
-window.addEventListener("beforeunload", ()=> saveState());
+  $("#prefillTemplate").addEventListener("click", ()=>{
+    if(!confirm("Insert study template tasks?")) return;
+    const template = [
+      {title:"Watch OOP video (chunk)", category:"OOP"}, {title:"DBMS: normalization video (chunk)", category:"DBMS"}, {title:"OS: process & threads video (chunk)", category:"OS"}, {title:"GenAI: Transformers video + notebook", category:"AI"}, {title:"Agentic AI: LangChain intro", category:"AI"}, {title:"PhD: draft application email", category:"PhD"}
+    ];
+    const now = new Date();
+    template.forEach((t,i)=> state.tasks.push({id:genId(), title:t.title, category:t.category, due: toLocalInput(new Date(now.getTime() + (i+1)*3600000)), remMin:15, done:false}));
+    saveState(); toast("Template inserted");
+  });
 
-// request notifications
-function tryRequestNotification(){ if("Notification" in window && Notification.permission === "default") Notification.requestPermission(); }
+  $("#notesArea").addEventListener("input", debounce(()=>{ state.notes = notesArea.value; saveState(); }, 600));
 
-/* ----- initial save if not present ----- */
-if(!localStorage.getItem(STORAGE_KEY)) { saveState(); }
+  $("#addPhd").addEventListener("click", ()=>{
+    const t = $("#phdTitle").value.trim();
+    const u = $("#phdUrl").value.trim();
+    if(!t || !u){ alert("Provide title and url"); return; }
+    state.phdLinks = state.phdLinks || []; state.phdLinks.push({id:genId(), title:t, url:u}); $("#phdTitle").value=""; $("#phdUrl").value=""; saveState(); toast("PhD link added", t);
+  });
+
+  $("#addReward").addEventListener("click", ()=>{
+    const text = $("#rewText").value.trim(); if(!text) return alert("Add reward text");
+    state.rewards = state.rewards || []; state.rewards.push({id:genId(), text, earned:false}); $("#rewText").value=""; saveState(); toast("Reward added");
+  });
+
+  $("#exportDataBtn").addEventListener("click", ()=>{
+    const blob = new Blob([JSON.stringify(state,null,2)], {type:'application/json'}); const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=`focus-sprint-backup-${new Date().toISOString().split('T')[0]}.json`; a.click(); URL.revokeObjectURL(a.href);
+  });
+
+  $("#importDataBtn").addEventListener("click", ()=> $("#importFileInput").click());
+  $("#importFileInput").addEventListener("change", e=>{
+    const file = e.target.files[0]; if(!file) return;
+    const reader = new FileReader(); reader.onload = ev=>{
+      try{ const imported = JSON.parse(ev.target.result); state = {...defaultState, ...imported}; saveState(); toast("Data imported"); } catch(err){ alert("Invalid file"); }
+    }; reader.readAsText(file);
+  });
+
+  window.addEventListener("beforeunload", ()=> saveState());
+
+  /* ----- 7. INITIALIZATION ----- */
+  function setDailyQuote(){
+    const todayIndex = new Date().getDate() % quotes.length;
+    $("#dailyQuote").textContent = `"${quotes[todayIndex]}"`;
+  }
+  setDailyQuote();
+  const now = new Date();
+  const msUntilMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 0,0,0) - now;
+  setTimeout(()=>{ setDailyQuote(); setInterval(setDailyQuote, 86400000); }, msUntilMidnight);
+
+  if(!localStorage.getItem(STORAGE_KEY)) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+  
+  checkAndResetStreak();
+  renderAll();
+  tryRequestNotification();
+  setInterval(checkReminders,30*1000);
+  setInterval(renderClock, 1000);
+
+})();
 </script>
 </body>
 </html>
-
-
