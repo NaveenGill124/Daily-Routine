@@ -185,9 +185,25 @@
 
 <script>
 /* ----- Utility first (genId must come before defaultState) ----- */
+/* ----- Utility ----- */
 function genId(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 
-/* ----- Daily Motivational Quote ----- */
+function todayTimeStr(hm){
+  const d=new Date(); const [hh,mm]=hm.split(":");
+  d.setHours(parseInt(hh,10),parseInt(mm,10),0,0);
+  return toLocalInput(d);
+}
+function toLocalInput(d){
+  const pad=n=>n<10? "0"+n: n;
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function escape(s){ if(!s) return ""; return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s){ return escape(s).replace(/"/g,'&quot;'); }
+
+function debounce(fn,ms){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; }
+
+/* ----- Daily Quote ----- */
 const quotes = [
   "Push yourself, because no one else will do it for you.",
   "Dreams don’t work unless you do.",
@@ -202,27 +218,17 @@ const quotes = [
   "Consistency creates momentum.",
   "Win the morning, win the day."
 ];
-
 function setDailyQuote(){
   const todayIndex = new Date().getDate() % quotes.length;
   document.getElementById("dailyQuote").textContent = `"${quotes[todayIndex]}"`;
 }
 setDailyQuote();
 const now = new Date();
-const msUntilMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1, 0,0,0) - now;
-setTimeout(()=>{ setDailyQuote(); setInterval(setDailyQuote, 86400000); }, msUntilMidnight);
+const msUntilMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1,0,0,0)-now;
+setTimeout(()=>{ setDailyQuote(); setInterval(setDailyQuote,86400000); }, msUntilMidnight);
 
+/* ----- Storage & State ----- */
 const STORAGE_KEY = "focusSprint_v2";
-
-function todayTimeStr(hm){
-  const d=new Date(); const [hh,mm]=hm.split(":");
-  d.setHours(parseInt(hh,10),parseInt(mm,10),0,0);
-  return toLocalInput(d);
-}
-function toLocalInput(d){
-  const pad=n=>n<10? "0"+n: n;
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
 
 const defaultState = {
   tasks: [
@@ -241,11 +247,46 @@ const defaultState = {
     {time:"15:00-17:00", desc:"GenAI (2 hrs)"},
     {time:"17:15-17:30", desc:"Quick Revision (15 min)"},
     {time:"20:30-21:30", desc:"PhD Applications (1 hr)"},
-    {time:"22:00-02:00", desc:"Night block: DSA / Core CS / Agents (4 hrs)"},
+    {time:"22:00-02:00", desc:"Night block: DSA / Core CS / Agents (4 hrs)"}
   ],
   streak:0,
   lastCompletionDate: null
 };
+
+let state = loadState();
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw){ localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultState)); return JSON.parse(JSON.stringify(defaultState)); }
+    return JSON.parse(raw);
+  }catch(e){ console.error(e); localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultState)); return JSON.parse(JSON.stringify(defaultState)); }
+}
+function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); renderAll(); }
+
+/* ----- Streak Logic ----- */
+function checkAndResetStreak(){
+  if(!state.lastCompletionDate){ state.streak=0; return; }
+  const today = new Date().toDateString();
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+  const yStr = yesterday.toDateString();
+  if(state.lastCompletionDate !== today && state.lastCompletionDate !== yStr) state.streak=0;
+}
+function updateStreak(){
+  const todayStr = new Date().toDateString();
+  if(state.lastCompletionDate === todayStr) return;
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+  const yStr = yesterday.toDateString();
+  state.streak = (state.lastCompletionDate === yStr) ? (state.streak||0)+1 : 1;
+  state.lastCompletionDate = todayStr;
+  saveState(); // <-- ensure streak is saved
+  if(state.streak && state.streak%7===0){ toast("Streak milestone!", `You've hit ${state.streak} days — take a reward!`); notify("Streak milestone", `You've hit ${state.streak} days`); }
+}
+
+/* ----- Initial Render ----- */
+checkAndResetStreak();
+renderAll();
+setInterval(()=>renderClock(),1000);
+
 
 
 <script>
